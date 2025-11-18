@@ -20,7 +20,6 @@ RECONNAISSANCE=(
     "ss -tuln"
     "lsblk"
     "df -h"
-    "ps aux"
     "whoami"
     "id"
     "uname -a"
@@ -33,12 +32,10 @@ RECONNAISSANCE=(
 
 PRIVILEGE_ESCALATION=(
     "sudo -l"
-    "getcap -r / 2>/dev/null"
     "cat /etc/passwd"
     "cat /etc/shadow"
     "ls -la /root"
     "find / -perm -4000 -exec ls -ldb {} 2>/dev/null \\;"
-    "ps aux | grep root"
 )
 
 PERSISTENCE=(
@@ -71,7 +68,6 @@ BENIGN_COMMANDS=(
     "journalctl -n 10"
     "curl --version"
     "man ls"
-    "top -b -n 1"
 )
 
 # Select a random attack type
@@ -100,11 +96,12 @@ benign_simulation() {
         local end_time="$(date +%H:%M:%S)"
 
         while IFS= read -r line; do
-            echo "BENIGN,\"$line\"" >> training_data.txt
+	    echo $line
+            echo "BENIGN \"$line\"" >> training_data.txt
         done < <(sudo ausearch -ts $start_date $start_time -te $end_date $end_time -i 2>/dev/null)
     done
 
-    echo "Benign activity ended at $(date -d @$end_time)"
+    echo "Benign activity ended at $(date -d $end_time)"
 
     echo "Completed Benign Activity Simulation"
 }
@@ -113,15 +110,9 @@ benign_simulation() {
 attack_simulation() {
     echo "Running Attack Simulation"
 
-    # Generate random number of commands from 5 to 15
+    local chosen_attack=$(chosen_attack_type)
 
-    local rand_number_commands=$((RANDOM % 11 + 5))
-
-    # Shuffle commands
-    for ((i=0; i < rand_number_commands; i++)); do
-        local chosen_attack=$(chosen_attack_type)
-
-        case $chosen_attack in
+    case $chosen_attack in
             "Reconnaissance")
                 local commands=("${RECONNAISSANCE[@]}")
                 ;;
@@ -139,8 +130,17 @@ attack_simulation() {
                 continue
                 ;;
         esac
+    
+    echo "Chosen attack type: $chosen_attack"
 
-        echo "Chosen attack type: $chosen_attack"
+    # Generate random number of commands from 5 to 15
+    
+    local rand_number_commands=$((RANDOM % 11 + 5))
+
+
+
+    # Shuffle commands
+    for ((i=0; i < rand_number_commands; i++)); do
 
         local start_date=$(date +%x)
         local start_time=$(date +%H:%M:%S)
@@ -154,12 +154,15 @@ attack_simulation() {
         local end_time="$(date +%H:%M:%S)"
 
         while IFS= read -r line; do
+            echo $line
             echo "${chosen_attack^^} \"$line\"" >> training_data.txt
         done < <(sudo ausearch -ts $start_date $start_time -te $end_date $end_time -i 2>/dev/null)
 
+        tail -n 1 training_data.txt
+
     done
 
-    echo "Completed attack session $session"
+    echo "Completed attack session"
 }
 
 main() {
@@ -171,9 +174,6 @@ main() {
         echo "Need sudo privileges to run this script for ausearch."
         echo sudo su
     fi
-
-    # Initialize the CSV file
-    > training_data.txt  # Create empty file
 
     ALL_SESSIONS=()
 
